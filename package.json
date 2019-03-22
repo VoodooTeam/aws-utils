@@ -1,0 +1,25 @@
+{
+  "name": "@voodoo.io/aws-utils",
+  "version": "0.0.1",
+  "description": "S3 utils",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VoodooTeam/aws-utils.git"
+  },
+  "author": "vincentvallet@voodoo.io",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/VoodooTeam/aws-utils/issues"
+  },
+  "homepage": "https://github.com/VoodooTeam/aws-utils#readme",
+  "dependencies": {
+    "async-await-retry": "^1.0.1"
+  },
+  "devDependencies": {
+    "eslint": "5.15.1"
+  }
+}
