@@ -1,11 +1,20 @@
 {
   "name": "@voodoo.io/aws-utils",
-  "version": "0.1.0",
-  "description": "S3 utils",
+  "version": "1.0.0",
+  "description": "AWS utils methods - using homemade retry system",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "NODE_ENV=test ./node_modules/.bin/jest",
+    "lint": "./node_modules/.bin/eslint -c ./.eslintrc ./"
   },
+  "engines": {
+    "node": ">=7.6.0"
+  },
+  "keywords": [
+    "AWS",
+    "utils",
+    "retry"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/VoodooTeam/aws-utils.git"
@@ -17,9 +26,12 @@
   },
   "homepage": "https://github.com/VoodooTeam/aws-utils#readme",
   "dependencies": {
-    "async-await-retry": "^1.0.1"
+    "async-await-retry": "1.0.1",
+    "aws-sdk": "2.437.0"
   },
   "devDependencies": {
-    "eslint": "5.15.1"
+    "aws-sdk-mock": "^4.4.0",
+    "eslint": "5.16.0",
+    "jest": "^24.7.1"
   }
 }

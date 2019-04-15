@@ -15,6 +15,12 @@ const retry = require('async-await-retry');
  * @param {Number} exponential : use exponential retry interval, by default true
  */
 exports.retry = async (fn, args, cb, retriesMax = 3, interval = 200, exponential = true) => {
+
+    if( process.env.NODE_ENV === 'test' ) {
+        interval = 50;
+        exponential = false;
+    }
+
     return await retry(fn, args, {
         retriesMax: retriesMax,
         interval: interval,
