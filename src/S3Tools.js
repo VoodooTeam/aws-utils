@@ -3,8 +3,8 @@
  */
 'use strict';
 
-const utils = require('./utils'),
-    zlib = require('zlib');
+const utils = require('./utils');
+const zlib = require('zlib');
 
 const BAD_PARAM = "S3_TOOLS_BAD_PARAM";
 const GET_OBJECT_RETURN_TYPE_ALLOWED = ["string", "buffer", "object", "all"];
@@ -37,7 +37,7 @@ class S3Tools {
                     if (err.retryable) {
                         try {
                             const data = await utils.retry(this.cli.getObject.bind(this.cli), [param], true, this.retryMax);
-                            const response = await formatGetObjectResponse(data, returnType, gzip);
+                            const response = await this._formatGetObjectResponse(data, returnType, gzip);
                             return resolve(response);
                         } catch (err) {
                             return reject(err);
@@ -51,7 +51,7 @@ class S3Tools {
                     return reject(new Error(FILE_NOT_EXIST));
                 }
 
-                const response = formatGetObjectResponse(data, returnType, gzip);
+                const response = this._formatGetObjectResponse(data, returnType, gzip);
                 return resolve(response);
             })
         })
@@ -66,7 +66,7 @@ class S3Tools {
      */
     putJsonObject(bucket, key, json) {
         return new Promise((resolve, reject) => {
-            if (typeof bucket !== "string" || typeof key !== "string") return reject(new Error(`${BAD_PARAM}_PutObject`));
+            if (typeof bucket !== "string" || typeof key !== "string" || typeof json !== "object") return reject(new Error(`${BAD_PARAM}_PutObject`));
             const param = {
                 Bucket: bucket,
                 Key: key,
@@ -90,44 +90,44 @@ class S3Tools {
             })
         })
     }
-}
 
-/**
- * Format the S3 response for GetObject
- *
- * @param {object} data - Response of S3
- * @param {string} returnType - Type of responsd waited
- * @param {boolean} gzip - Gzip or not
- */
-function formatGetObjectResponse(data, returnType, gzip) {
-    return new Promise((resolve, reject) => {
-        //Check wich return type is ask to returning well formatted data
-        switch (returnType) {
-            case "buffer":
-                if (!gzip) return resolve(data.Body);
-                zlib.gunzip(data.Body, (err, data) => {
-                    if (err) return reject(err);
+    /**
+     * Format the S3 response for GetObject
+     *
+     * @param {object} data - Response of S3
+     * @param {string} returnType - Type of responsd waited
+     * @param {boolean} gzip - Gzip or not
+     */
+    _formatGetObjectResponse(data, returnType, gzip) {
+        return new Promise((resolve, reject) => {
+            //Check wich return type is ask to returning well formatted data
+            switch (returnType) {
+                case "buffer":
+                    if (!gzip) return resolve(data.Body);
+                    zlib.gunzip(data.Body, (err, data) => {
+                        if (err) return reject(err);
+                        return resolve(data);
+                    });
+                    break;
+                case "string":
+                    if (!gzip) return resolve(data.Body.toString());
+                    zlib.gunzip(data.Body, (err, data) => {
+                        if (err) return reject(err);
+                        return resolve(data.toString());
+                    });
+                    break;
+                case "object":
+                    if (!gzip) return resolve(JSON.parse(data.Body.toString()));
+                    zlib.gunzip(data.Body, (err, data) => {
+                        if (err) return reject(err);
+                        return resolve(JSON.parse(data.toString()));
+                    });
+                    break;
+                default:
                     return resolve(data);
-                });
-                break;
-            case "string":
-                if (!gzip) return resolve(data.Body.toString());
-                zlib.gunzip(data.Body, (err, data) => {
-                    if (err) return reject(err);
-                    return resolve(data.toString());
-                });
-                break;
-            case "object":
-                if (!gzip) return resolve(JSON.parse(data.Body.toString()));
-                zlib.gunzip(data.Body, (err, data) => {
-                    if (err) return reject(err);
-                    return resolve(JSON.parse(data.toString()));
-                });
-                break;
-            default:
-                return resolve(data);
-        }
-    })
+            }
+        });
+    }
 }
 
 module.exports = S3Tools;
