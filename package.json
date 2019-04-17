@@ -15,12 +15,12 @@
     "utils",
     "retry"
   ],
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/VoodooTeam/aws-utils.git"
   },
   "author": "vincentvallet@voodoo.io",
-  "license": "ISC",
   "bugs": {
     "url": "https://github.com/VoodooTeam/aws-utils/issues"
   },
