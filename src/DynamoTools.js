@@ -16,6 +16,7 @@ class DynamoTools {
      */
     constructor(cli, opt = {}) {
         this.cli = cli;
+        this.logger = opt.logger;
         // fallback cli to use in case the originale (this.cli) fail
         // we use the default dynamo client
         this.cliFallback = new aws.DynamoDB.DocumentClient();
@@ -168,6 +169,9 @@ class DynamoTools {
                             // in case we use DAX and if we got an error
                             // use Dynamo directly
                             if(AWSCli.constructor.name === 'AmazonDaxClient') {
+                                if (this.logger) {
+                                    this.logger.error(err);
+                                }
                                 try {
                                     await this._execute(method, AWSMethod, dynamoTable, hashKeyName, hashKeyValue, results, params, this.cliFallback);
                                     return resolve(results);

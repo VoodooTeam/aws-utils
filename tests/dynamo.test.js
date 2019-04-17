@@ -137,7 +137,15 @@ describe('queryHashKey', () => {
 
             function AmazonDaxClient(){ this.query = (params, cb) => {const err = new Error('Error from Dax'); err.retryable = true; cb(err, null);}};
             const daxClient = new AmazonDaxClient();
-            dynamoTools = new awsUtils(daxClient);
+            const logger = require('pino')();
+            logger.child({
+                    app_name: `App`,
+                    env: `test`,
+                }
+            );
+            dynamoTools = new awsUtils(daxClient, {
+                logger: logger
+            });
 
             await dynamoTools.queryHashKey('errorWithDax', 'key', 'value');
             throw new Error('This test should fail !');
