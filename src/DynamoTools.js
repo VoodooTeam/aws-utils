@@ -113,6 +113,8 @@ class DynamoTools {
      */
     _promiseFunction (AWSMethod, method, dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey, results, cli) {
         const AWSCli = cli || this.cli;
+        const AWSCliFallback = this.cliFallback;
+        const logger = this.logger;
 
         // error message
         const errObj = {
@@ -169,11 +171,11 @@ class DynamoTools {
                             // in case we use DAX and if we got an error
                             // use Dynamo directly
                             if(AWSCli.constructor.name === 'AmazonDaxClient') {
-                                if (this.logger) {
-                                    this.logger.error(err);
+                                if (logger) {
+                                    logger.error(err);
                                 }
                                 try {
-                                    await this._execute(method, AWSMethod, dynamoTable, hashKeyName, hashKeyValue, results, params, this.cliFallback);
+                                    await this._execute(method, AWSMethod, dynamoTable, hashKeyName, hashKeyValue, results, params, AWSCliFallback);
                                     return resolve(results);
                                 } catch (errDynamo) {
                                     err.moreInfos = errDynamo;
