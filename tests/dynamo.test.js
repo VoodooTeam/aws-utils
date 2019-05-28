@@ -55,6 +55,74 @@ AWS.mock('DynamoDB.DocumentClient', 'query', function (params, callback) {
 	callback(null, { 'Items': res, 'LastEvaluatedKey': LastEvaluatedKey });
 });
 
+AWS.mock('DynamoDB.DocumentClient', 'batchGet', function (params, callback) {
+    let response = {};
+    let res = [];
+
+	if (params.RequestItems.hasOwnProperty('myTable')) {
+		res = [{
+			id: 1
+		},
+		{
+			id: 2
+        }];
+        
+        response = {'myTable': res };
+	} else if (params.RequestItems.hasOwnProperty('error')) {
+        return callback(new Error('Error from Dynamo'));
+    } else if (params.RequestItems.hasOwnProperty('errorWithRetry')) {
+        const err = new Error('Error from Dynamo');
+        err.retryable = true;
+        return callback(err);
+    } else if (params.RequestItems.hasOwnProperty('errorBadResponse')) {
+        response = {'myTable': null };
+    } else if (params.RequestItems.hasOwnProperty('errorWithOneRetry')) {
+        if (nbRetry === 0) {
+            nbRetry++;
+            const err = new Error('Error !');
+            err.retryable = true;
+            return callback(err);
+        }
+
+        res = [{
+			id: 2
+        }];
+
+        response = {'errorWithOneRetry': res };
+    }
+
+	callback(null, { 'Responses': response});
+});
+
+AWS.mock('DynamoDB.DocumentClient', 'get', function (params, callback) {
+    let res = [];
+
+	if (params.TableName === 'myTable') {
+		res = {
+            id: 1
+		};
+	} else if (params.TableName === 'error') {
+        return callback(new Error('Error from Dynamo'));
+    } else if (params.TableName === 'errorWithRetry') {
+        const err = new Error('Error from Dynamo');
+        err.retryable = true;
+        return callback(err);
+    } else if (params.TableName === 'errorWithOneRetry') {
+        if (nbRetry === 0) {
+            nbRetry++;
+            const err = new Error('Error !');
+            err.retryable = true;
+            return callback(err);
+        }
+
+        res = {
+			id: 2
+		};
+    }
+
+	callback(null, { 'Item': res });
+});
+
 AWS.mock('DynamoDB.DocumentClient', 'scan', function (params, callback) {
 	const res = [{
 			id: 1
@@ -271,6 +339,137 @@ describe('putItem', () => {
 
         try {
             await dynamoTools.putItem(null, {});
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('BAD_PARAM');
+        }
+    })
+})
+
+describe('getItems', () => {
+    let dynamoTools;
+
+    beforeEach(() => {
+        nbRetry = 0;
+        const awsUtils = require('../index').dynamo;
+
+        const aws = require('aws-sdk');
+        aws.config.update({region: 'eu-west-1'});
+        const dynamoCli = new aws.DynamoDB.DocumentClient();
+        dynamoTools = new awsUtils(dynamoCli);
+    })
+
+    it('Normal case', async () => {
+        const res = await dynamoTools.getItems('myTable', []);
+
+        expect(res.length).toEqual(2);
+        expect(res[0].id).toEqual(1);
+    })
+
+    it('Should throw an error', async () => {
+        try {
+            await dynamoTools.getItems('error', []);
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('Error from Dynamo');
+        }
+    })
+
+    it('Should retry but throw an error', async () => {
+        try {
+            await dynamoTools.getItems('errorWithRetry', []);
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('Error from Dynamo');
+        }
+    }, 10000)
+
+    it('Should retry, then fail one time then get data', async () => {
+        const res = await dynamoTools.getItems('errorWithOneRetry', []);
+        expect(res.length).toEqual(1);
+        expect(res[0].id).toEqual(2);
+    })
+
+    it('Should return empty cause bad response format', async () => {
+        const res = await dynamoTools.getItems('errorBadResponse', []);
+        expect(res.length).toEqual(0);
+    })
+
+    it('Should fail cause bad params', async () => {
+        try {
+            await dynamoTools.getItems('errorWithOneRetry', {});
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('BAD_PARAM');
+        }
+
+        try {
+            await dynamoTools.getItems('errorWithOneRetry', null);
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('BAD_PARAM');
+        }
+
+        try {
+            await dynamoTools.getItems(null);
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('BAD_PARAM');
+        }
+    })
+})
+
+describe('getItem', () => {
+    let dynamoTools;
+
+    beforeEach(() => {
+        nbRetry = 0;
+        const awsUtils = require('../index').dynamo;
+
+        const aws = require('aws-sdk');
+        aws.config.update({region: 'eu-west-1'});
+        const dynamoCli = new aws.DynamoDB.DocumentClient();
+        dynamoTools = new awsUtils(dynamoCli);
+    })
+
+    it('Normal case', async () => {
+        const res = await dynamoTools.getItem('myTable', {});
+        expect(res.id).toEqual(1);
+    })
+
+    it('Should throw an error', async () => {
+        try {
+            await dynamoTools.getItem('error', {});
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('Error from Dynamo');
+        }
+    })
+
+    it('Should retry but throw an error', async () => {
+        try {
+            await dynamoTools.getItem('errorWithRetry', {});
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('Error from Dynamo');
+        }
+    }, 10000)
+
+    it('Should retry, then fail one time then get data', async () => {
+        const res = await dynamoTools.getItem('errorWithOneRetry', {});
+        expect(res.id).toEqual(2)
+    })
+
+    it('Should fail cause bad params', async () => {
+        try {
+            await dynamoTools.getItem('errorWithOneRetry');
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('BAD_PARAM');
+        }
+
+        try {
+            await dynamoTools.getItem(null);
             throw new Error('This test should fail !');
         } catch (err) {
             expect(err.message).toEqual('BAD_PARAM');

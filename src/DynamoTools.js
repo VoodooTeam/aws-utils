@@ -33,7 +33,7 @@ class DynamoTools {
      * @param results
      */
     queryHashKey(dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey = null, results = [], cli = null) {
-        return this._promiseFunction('query', 'queryHashKey', dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey = null, results = [], cli = null);
+        return this._promiseFunction('query', 'queryHashKey', dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey, results, cli);
     }
 
     /**
@@ -97,6 +97,107 @@ class DynamoTools {
      */
     scan(dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey = null, results = [], cli = null) {
         return this._promiseFunction('scan', 'scan', dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey, results, cli); 
+    }
+
+    /**
+    * This function will get an array of items from dynamoDB
+    *
+    * @param {string} dynamoTable - The name of the dynamoDB table
+    * @param {array} partitionKeys - An array of partition keys
+    */
+    getItems(dynamoTable, partitionKeys) {
+        const errObj = {
+            from: CLASS_NAME,
+            params: {
+                function_name: 'getItems',
+                dynamo_table: dynamoTable,
+                partition_key: partitionKeys
+            }
+        };
+
+        return new Promise((resolve, reject) => {
+            if (typeof dynamoTable !== 'string' || typeof partitionKeys !== 'object' || !Array.isArray(partitionKeys)) {
+                let myErr = new Error('BAD_PARAM')
+                myErr.moreInfo = errObj;
+                return reject(myErr)
+            }
+
+            const param = {
+                RequestItems: {
+                    [dynamoTable]: {
+                        Keys: partitionKeys
+                    }
+                }
+            }
+
+            this.cli.batchGet(param, async (err, data) => {
+                if (err) {
+                    if (err.retryable) {
+                        try {
+                            const data = await utils.retry(this.cli.batchGet.bind(this.cli), [param], true, this.retryMax);
+                            return resolve(this._formatRes(data, dynamoTable));
+                        } catch (err) {
+                            err.moreInfo = errObj;
+                            return reject(err)
+                        }
+                    }
+                    err.moreInfo = errObj;
+                    return reject(err)
+                }
+
+                return resolve(this._formatRes(data, dynamoTable));
+            })
+        })
+    }
+
+    _formatRes(data, dynamoTable) {
+        if (data.hasOwnProperty('Responses') && data.Responses.hasOwnProperty(dynamoTable) && Array.isArray(data.Responses[dynamoTable])) return data.Responses[dynamoTable];
+        return [];
+    } 
+
+    /**
+     * This method will get a specific object from dynamo
+     * 
+     * @param {string} dynamoTable 
+     * @param {Object} partitionKey 
+     */
+    getItem(dynamoTable, partitionKey) {
+        const errObj = {
+            from: CLASS_NAME,
+            params: {
+                dynamo_table: dynamoTable,
+                partition_key: partitionKey
+            }
+        };
+        return new Promise((resolve, reject) => {
+            if (typeof dynamoTable !== 'string' || typeof partitionKey !== 'object' || Array.isArray(partitionKey)) {
+                let myErr = new Error('BAD_PARAM')
+                myErr.moreInfo = errObj;
+                return reject(myErr);
+            }
+            const param = {
+                TableName: dynamoTable,
+                Key: partitionKey
+            }
+
+            this.cli.get(param, async (err, data) => {
+                if (err) {
+                    if (err.retryable) {
+                        try {
+                            const data = await utils.retry(this.cli.get.bind(this.cli), [param], true, this.retryMax);
+                            return resolve(data.Item)
+                        } catch (err) {
+                            err.moreInfo = errObj;
+                            return reject(err);
+                        }
+                    }
+                    err.moreInfo = errObj;
+                    return reject(err);
+                }
+
+                return resolve(data.Item)
+            })
+        })
     }
 
     /**
