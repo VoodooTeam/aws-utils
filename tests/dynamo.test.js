@@ -2,6 +2,8 @@ const AWS = require('aws-sdk-mock');
 
 let nbRetry = 0;
 
+function AmazonDaxClient(){ this.query = (params, cb) => {const err = new Error('Error from Dax'); err.retryable = true; cb(err, null);}}
+
 AWS.mock('DynamoDB.DocumentClient', 'query', function (params, callback) {
     let res = [];
     let LastEvaluatedKey = null;
@@ -129,9 +131,16 @@ AWS.mock('DynamoDB.DocumentClient', 'scan', function (params, callback) {
 		},
 		{
 			id: 2
-		}];
+        }];
+    let lastEvaluatedKey = null
 
-	callback(null, { 'Items': res });
+    // remove one item to respect the limit of 1 item
+    if(params.Limit) {
+        res.pop()
+        lastEvaluatedKey = {}
+    }
+
+	callback(null, { 'Items': res, 'LastEvaluatedKey': lastEvaluatedKey });
 });
 
 AWS.mock('DynamoDB.DocumentClient', 'put', function (params, callback) {
@@ -169,16 +178,16 @@ describe('queryHashKey', () => {
     it('Normal case', async () => {
         const res = await dynamoTools.queryHashKey('myTable', 'key', 'value');
 
-        expect(res.length).toEqual(2);
-        expect(res[0].id).toEqual(1);
+        expect(res.Items.length).toEqual(2);
+        expect(res.Items[0].id).toEqual(1);
     })
 
     it('Should return data from multiple calls (pagination)', async () => {
         const res = await dynamoTools.queryHashKey('myTableWithPagination', 'key', 'value');
 
-        expect(res.length).toEqual(2);
-        expect(res[0].id).toEqual(1);
-        expect(res[1].id).toEqual(2);
+        expect(res.Items.length).toEqual(2);
+        expect(res.Items[0].id).toEqual(1);
+        expect(res.Items[1].id).toEqual(2);
     })
 
     it('Should throw an error', async () => {
@@ -203,7 +212,6 @@ describe('queryHashKey', () => {
         try {
             const awsUtils = require('../src/DynamoTools');
 
-            function AmazonDaxClient(){ this.query = (params, cb) => {const err = new Error('Error from Dax'); err.retryable = true; cb(err, null);}};
             const daxClient = new AmazonDaxClient();
             const logger = require('pino')();
             logger.child({
@@ -225,18 +233,17 @@ describe('queryHashKey', () => {
     it('Should retry with fallback cli and succeed', async () => {
         const awsUtils = require('../src/DynamoTools');
 
-        function AmazonDaxClient(){ this.query = (params, cb) => {const err = new Error('Error from Dax'); err.retryable = true; cb(err, null);}};
         const daxClient = new AmazonDaxClient();
         dynamoTools = new awsUtils(daxClient);
 
         const res = await dynamoTools.queryHashKey('errorWithDaxButOkWithDynamo', 'key', 'value');
-        expect(res.length).toEqual(1);
+        expect(res.Items.length).toEqual(1);
     }, 10000)
 
     it('Should retry, then fail one time then get data', async () => {
         const res = await dynamoTools.queryHashKey('errorWithOneRetry', 'key', 'value');
-        expect(res.length).toEqual(1);
-        expect(res[0].id).toEqual(2)
+        expect(res.Items.length).toEqual(1);
+        expect(res.Items[0].id).toEqual(2)
     })
 
     it('Should fail cause bad params', async () => {
@@ -264,7 +271,7 @@ describe('queryHashKey', () => {
 
     it('Should handle strange cases when no Items property is found', async () => {
         const res = await dynamoTools.queryHashKey('noItems', 'key', 'value');
-        expect(res.length).toEqual(0);
+        expect(res.Items.length).toEqual(0);
     })
 })
 
@@ -283,8 +290,15 @@ describe('scan', () => {
     it('Normal case', async () => {
         const res = await dynamoTools.scan('myTable');
 
-        expect(res.length).toEqual(2);
-        expect(res[0].id).toEqual(1)
+        expect(res.Items.length).toEqual(2);
+        expect(res.Items[0].id).toEqual(1)
+    })
+
+    it('Normal case with limit', async () => {
+        const res = await dynamoTools.scan('myTable', null, null, null, 1);
+
+        expect(res.Items.length).toEqual(1);
+        expect(res.Items[0].id).toEqual(1)
     })
 })
 

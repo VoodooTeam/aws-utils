@@ -27,6 +27,18 @@ Supported and tested : >= 7.6
 | 8.x           | yes           | yes            |
 | >= 7.6        | yes           | yes            |
 
+
+**BREAKING CHANGES since version 2.0**
+
+Now dynamo tools returns an object and not directly an array of items.
+
+```json
+{
+    Items:[ { ....} , { ... } ],
+    LastEvaluatedKey: {....}
+}
+```
+
 # Installation
 
 ```console
@@ -66,24 +78,26 @@ const res = await dynamoTools.scan('myTable');
 const res = await dynamoTools.putItem('myTable', {'key': 'value'});
 ```
 
-#### queryHashKey(dynamoTable, hashKeyName, hashKeyValue, [exclusiveStartKey])
+#### queryHashKey(dynamoTable, hashKeyName, hashKeyValue, [exclusiveStartKey], [limit])
 
 * `dynamoTable` : table's name
 * `hashKeyName` : hashkey's name
 * `hashKeyValue` : hashkey's value
 * `exclusiveStartKey` : (optional) start search at a specific key
+* `limit` : (optional) don't return more items than the limit
 
 #### putItem(dynamoTable, item)
 
 * `dynamoTable` : table's name
 * `item` : item to insert
 
-#### scan(dynamoTable, [hashKeyName], [hashKeyValue], [exclusiveStartKey])
+#### scan(dynamoTable, [hashKeyName], [hashKeyValue], [exclusiveStartKey], [limit])
 
 * `dynamoTable` : table's name
 * `hashKeyName` : (optional) hashkey's name
 * `hashKeyValue` : (optional) hashkey's value
 * `exclusiveStartKey` : (optional) start search at a specific key
+* `limit` : (optional) don't return more items than the limit
 
 If no hashkey is provided it returns the full table.
 
