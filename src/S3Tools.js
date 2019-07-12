@@ -128,6 +128,34 @@ class S3Tools {
             }
         });
     }
+
+    /**
+     * Empty a directory. S3 should automatically delete the directory.
+     * @param {String} bucket 
+     * @param {String} dir 
+     */
+    async emptyS3Directory(bucket, dir) {
+        const listParams = {
+            Bucket: bucket,
+            Prefix: dir
+        };
+        const listedObjects = await this.cli.listObjectsV2(listParams).promise();
+
+        if (listedObjects.Contents.length === 0) return;
+    
+        const deleteParams = {
+            Bucket: bucket,
+            Delete: { Objects: [] }
+        };
+    
+        listedObjects.Contents.forEach(({ Key }) => {
+            deleteParams.Delete.Objects.push({ Key });
+        });
+    
+        await this.cli.deleteObjects(deleteParams).promise();
+    
+        if (listedObjects.IsTruncated) await this.emptyS3Directory(bucket, dir).bind(this);
+    }
 }
 
 module.exports = S3Tools;

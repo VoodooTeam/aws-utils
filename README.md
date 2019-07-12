@@ -78,6 +78,12 @@ const res = await dynamoTools.scan('myTable');
 const res = await dynamoTools.putItem('myTable', {'key': 'value'});
 ```
 
+### delete item
+
+```javascript
+const res = await dynamoTools.deleteItem('myTable', {'key': 'value'});
+```
+
 #### queryHashKey(dynamoTable, hashKeyName, hashKeyValue, [exclusiveStartKey], [limit])
 
 * `dynamoTable` : table's name
@@ -100,6 +106,11 @@ const res = await dynamoTools.putItem('myTable', {'key': 'value'});
 * `limit` : (optional) don't return more items than the limit
 
 If no hashkey is provided it returns the full table.
+
+#### deleteItem(dynamoTable, key)
+
+* `dynamoTable` : table's name
+* `key` : hashkey to delete
 
 
 ## Secret Manager tools
@@ -161,6 +172,17 @@ const res = await s3Tools.putJsonObject('bucket', 'key', {"key": "value"});
 * `bucket` : bucket's name
 * `key` : path to the ressource (/path/file.json)
 * `item` : json object to save on S3
+
+### emptyS3Directory
+
+```javascript
+const res = await s3Tools.emptyS3Directory('bucket', 'dir/');
+```
+
+#### emptyS3Directory(bucket, dir)
+
+* `bucket` : bucket's name
+* `dir` : directory to remove
 
 # Test
 

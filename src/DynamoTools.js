@@ -201,6 +201,23 @@ class DynamoTools {
     }
 
     /**
+     * Delete a specific item by hashkey
+     * @param {String} table 
+     * @param {String} key 
+     */
+    async deleteItem(table, key) {
+        const params = {
+            TableName: table,
+            Key: key
+        };
+        try {
+            await this.cli.delete(params).promise();
+        } catch (err) {
+            throw err
+        }
+    }
+
+    /**
      * Private method to execute a method from aws sdk as a promise, with retry system.
      * 
      * @param {Sting} AWSMethod - method from aws cli to execute 
