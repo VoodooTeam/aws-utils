@@ -32,8 +32,8 @@ class DynamoTools {
      * @param {Object} exclusiveStartKey - (optional) use for pagination
      * @param results
      */
-    queryHashKey(dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey = null, limit = null, results = {Items: []}, cli = null) {
-        return this._promiseFunction('query', 'queryHashKey', dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey, limit, results, cli);
+    queryHashKey(dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey = null, limit = null, params = {}, results = {Items: []}, cli = null) {
+        return this._promiseFunction('query', 'queryHashKey', dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey, limit, params, results, cli);
     }
 
     /**
@@ -93,10 +93,12 @@ class DynamoTools {
      * @param {string} hashKeyName - (optional) The name of the hashkey
      * @param {string} hashKeyValue - (optional) The value of the hashkey
      * @param {Number} exclusiveStartKey - (optional) use for pagination
+     * @param {Number} limit - maximum number of items to return
+     * @param {Object} params - object with the aws-sdk syntax for sending params to dynamo
      * @param results
      */
-    scan(dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey = null, limit = null, results = {Items: []}, cli = null) {
-        return this._promiseFunction('scan', 'scan', dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey, limit, results, cli); 
+    scan(dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey = null, limit = null, params = {}, results = {Items: []}, cli = null) {
+        return this._promiseFunction('scan', 'scan', dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey, limit, params, results, cli); 
     }
 
     /**
@@ -210,11 +212,8 @@ class DynamoTools {
             TableName: table,
             Key: key
         };
-        try {
-            await this.cli.delete(params).promise();
-        } catch (err) {
-            throw err
-        }
+        
+        await this.cli.delete(params).promise();
     }
 
     /**
@@ -229,8 +228,9 @@ class DynamoTools {
      * @param {Object} results - query's results 
      * @param {*} cli - fallback cli in case the default one fail, useful when we use DAX and we want to fallback to dynamo 
      * @param {Number} limit - in case of specific limit
+     * @param {Object} params - object with the aws-sdk syntax for sending params to dynamo
      */
-    _promiseFunction (AWSMethod, method, dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey, limit, results, cli) {
+    _promiseFunction (AWSMethod, method, dynamoTable, hashKeyName, hashKeyValue, exclusiveStartKey, limit, params, results, cli) {
         const AWSCli = cli || this.cli;
         const AWSCliFallback = this.cliFallback;
         const logger = this.logger;
@@ -254,9 +254,9 @@ class DynamoTools {
                 return reject(myErr);
             }
 
-            const params = {
-                TableName: dynamoTable
-            };
+            if(!params) params = {}
+
+            params.TableName = dynamoTable
 
             if(limit) {
                 params.Limit = limit
@@ -313,7 +313,7 @@ class DynamoTools {
                 }
 
                 // collect data into "results" before return it
-                await this._collecData(method, AWSMethod, data, dynamoTable, hashKeyName, hashKeyValue, results, AWSCli, limit);
+                await this._collecData(method, AWSMethod, data, dynamoTable, hashKeyName, hashKeyValue, results, AWSCli, limit, params);
                 return resolve(results);
             })
         })
@@ -335,7 +335,7 @@ class DynamoTools {
         // retry the method with its original params
         const data = await utils.retry(cli[cliFunc], [params], true, this.retryMax);
         // collect data into results array
-        await this._collecData(func, cliFunc, data, dynamoTable, hashKeyName, hashKeyValue, results, cli, limit)
+        await this._collecData(func, cliFunc, data, dynamoTable, hashKeyName, hashKeyValue, results, cli, limit, params)
         return results;
     }
 
@@ -351,7 +351,7 @@ class DynamoTools {
      * @param {Array} results - array of results
      * @param {*} AWSCli - aws-sdk instance to use
      */
-    async _collecData (func, cliFunc, data, dynamoTable, hashKeyName, hashKeyValue, results, AWSCli, limit) {
+    async _collecData (func, cliFunc, data, dynamoTable, hashKeyName, hashKeyValue, results, AWSCli, limit, params) {
         // collect data from "Items" property
         if (data && data.Items && data.Items.length > 0) {
 
@@ -362,7 +362,7 @@ class DynamoTools {
             results.LastEvaluatedKey = data.LastEvaluatedKey;
         }
         // if we need pagination, then recall the original method of dynamoTools
-        if (data.LastEvaluatedKey && (limit == null || limit > results.Items.length)) return await this._promiseFunction(cliFunc, func, dynamoTable, hashKeyName, hashKeyValue, data.LastEvaluatedKey, limit, results, AWSCli);
+        if (data.LastEvaluatedKey && (limit == null || limit > results.Items.length)) return await this._promiseFunction(cliFunc, func, dynamoTable, hashKeyName, hashKeyValue, data.LastEvaluatedKey, limit, params, results, AWSCli);
         return results;
     }
 }
