@@ -41,11 +41,13 @@ class DynamoTools {
      *
      * @param {string} dynamoTable - The name of the dynamo table
      * @param customParams - query with the conditions
+     * @param response
+     * @param startKey
      * @returns results
      */
-    query(dynamoTable, customParams, response = [], startKey = null) {
+    query(dynamoTable, customParams, response = {Items: []}, startKey = null) {
         return new Promise((resolve,reject) => {
-            if(typeof tableName !== 'string' ||
+            if(typeof dynamoTable !== 'string' ||
               !Array.isArray(customParams.conditions)) {
                 let myErr = new Error('BAD_PARAM');
                 myErr.moreInfo = {
@@ -88,46 +90,41 @@ class DynamoTools {
                 params.ExpressionAttributeNames = keyName
             }
 
+            const errObj = {
+                from: CLASS_NAME,
+                params: {
+                    function_name: 'query',
+                    dynamo_table: dynamoTable,
+                    params: params
+                }
+            };
+
             this.cli.query(params, async (err,data) => {
                 if (err) {
                     if (err.retryable) {
                         try {
-                            const data = await utils.retry(this.cli.query.bind(this.cli), params, this.retryMax);
+                            const data = await utils.retry(this.cli.query.bind(this.cli), [params], this.retryMax);
 
                             if(!data.Items) return resolve(response);
                             for(const item of data.Items) {
-                                response.push(item)
+                                response.Items.push(item)
                             }
-                            if(data.LastEvaluatedKey) return this.query(dynamoTable, params, response, data.LastEvaluatedKey);
+                            if(data.LastEvaluatedKey) return this.query(dynamoTable, customParams, response, data.LastEvaluatedKey);
                             return resolve(response)
                         } catch (err) {
-                            err.moreInfo = {
-                                from: CLASS_NAME,
-                                params: {
-                                    function_name: 'query',
-                                    dynamo_table: dynamoTable,
-                                    params: params
-                                }
-                            };
+                            err.moreInfo = errObj;
                             return reject(err)
                         }
                     }
-                    err.moreInfo = {
-                        from: CLASS_NAME,
-                        params: {
-                            function_name: 'query',
-                            dynamo_table: dynamoTable,
-                            params: params
-                        }
-                    };
+                    err.moreInfo = errObj;
                     return reject(err)
                 }
 
                 if(!data.Items) return resolve(response);
                 for(const item of data.Items) {
-                    response.push(item)
+                    response.Items.push(item)
                 }
-                if(data.LastEvaluatedKey) return this.query(dynamoTable, params, response, data.LastEvaluatedKey);
+                if(data.LastEvaluatedKey) return this.query(dynamoTable, customParams, response, data.LastEvaluatedKey);
                 return resolve(response)
             })
         })
@@ -362,7 +359,7 @@ class DynamoTools {
                 if (err) {
                     if (err.retryable) {
                         try {
-                            await utils.retry(this.cli.update.bind(this.cli), param, this.retryMax);
+                            await utils.retry(this.cli.update.bind(this.cli), [param], this.retryMax);
                             return resolve()
                         } catch (err) {
                             err.more_infos_updateItem = {
@@ -389,8 +386,6 @@ class DynamoTools {
             })
         })
     }
-
-
 
     /**
      * Delete a specific item by hashkey
@@ -503,7 +498,7 @@ class DynamoTools {
                 }
 
                 // collect data into "results" before return it
-                await this._collecData(method, AWSMethod, data, dynamoTable, hashKeyName, hashKeyValue, results, AWSCli, limit, params);
+                await this._collectData(method, AWSMethod, data, dynamoTable, hashKeyName, hashKeyValue, results, AWSCli, limit, params);
                 return resolve(results);
             })
         })
@@ -525,7 +520,7 @@ class DynamoTools {
         // retry the method with its original params
         const data = await utils.retry(cli[cliFunc], [params], true, this.retryMax);
         // collect data into results array
-        await this._collecData(func, cliFunc, data, dynamoTable, hashKeyName, hashKeyValue, results, cli, limit, params);
+        await this._collectData(func, cliFunc, data, dynamoTable, hashKeyName, hashKeyValue, results, cli, limit, params);
         return results;
     }
 
@@ -541,7 +536,7 @@ class DynamoTools {
      * @param {Array} results - array of results
      * @param {*} AWSCli - aws-sdk instance to use
      */
-    async _collecData (func, cliFunc, data, dynamoTable, hashKeyName, hashKeyValue, results, AWSCli, limit, params) {
+    async _collectData (func, cliFunc, data, dynamoTable, hashKeyName, hashKeyValue, results, AWSCli, limit, params) {
         // collect data from "Items" property
         if (data && data.Items && data.Items.length > 0) {
 
