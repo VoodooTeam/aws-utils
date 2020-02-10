@@ -163,7 +163,7 @@ describe('_formatGetObjectResponse', () => {
     let s3Tools;
 
     function zip(data) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             zlib.gzip(data, (err, compressed) => {
                 if (err) throw err;
                 resolve(compressed);

@@ -66,6 +66,10 @@ const dynamoTools = new awsUtils(dynamoCli)
 const res = await dynamoTools.queryHashKey('myTable', 'key', 'value');
 ```
 
+```javascript
+const res = await dynamoTools.query('myTable', { 'conditions': [{'key': 'value', 'operator': 'value', 'value': [] /** or ''**/}]})
+```
+
 ### Scan
 
 ```javascript
@@ -76,6 +80,12 @@ const res = await dynamoTools.scan('myTable');
 
 ```javascript
 const res = await dynamoTools.putItem('myTable', {'key': 'value'});
+```
+
+### Update item
+
+```javascript
+await dynamoTools.update('myTable', {'key': {'primaryKey': 'value', 'sortKey': 'value'},'add': {['column1']: 'value'}, 'set': {'column2': 'value'}});
 ```
 
 ### delete item
@@ -92,6 +102,11 @@ const res = await dynamoTools.deleteItem('myTable', {'key': 'value'});
 * `exclusiveStartKey` : (optional) start search at a specific key
 * `limit` : (optional) don't return more items than the limit
 
+#### query(dynamoTable, customParams)
+* `dynamoTable` : table's name
+* `customParams` : object with the conditions of the query 
+
+
 #### putItem(dynamoTable, item)
 
 * `dynamoTable` : table's name
@@ -106,6 +121,11 @@ const res = await dynamoTools.deleteItem('myTable', {'key': 'value'});
 * `limit` : (optional) don't return more items than the limit
 
 If no hashkey is provided it returns the full table.
+
+#### updateItem(dynamoTable, params)
+* `dynamoTable` : table's name
+* `params` : parameters with columns to update
+
 
 #### deleteItem(dynamoTable, key)
 

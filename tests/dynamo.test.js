@@ -61,24 +61,24 @@ AWS.mock('DynamoDB.DocumentClient', 'batchGet', function (params, callback) {
     let response = {};
     let res = [];
 
-	if (params.RequestItems.hasOwnProperty('myTable')) {
+	if (Object.prototype.hasOwnProperty.call(params.RequestItems, 'myTable')) {
 		res = [{
 			id: 1
 		},
 		{
 			id: 2
         }];
-        
+
         response = {'myTable': res };
-	} else if (params.RequestItems.hasOwnProperty('error')) {
+	} else if (Object.prototype.hasOwnProperty.call(params.RequestItems, 'error')) {
         return callback(new Error('Error from Dynamo'));
-    } else if (params.RequestItems.hasOwnProperty('errorWithRetry')) {
+    } else if (Object.prototype.hasOwnProperty.call(params.RequestItems, 'errorWithRetry')) {
         const err = new Error('Error from Dynamo');
         err.retryable = true;
         return callback(err);
-    } else if (params.RequestItems.hasOwnProperty('errorBadResponse')) {
+    } else if ((Object.prototype.hasOwnProperty.call(params.RequestItems, 'errorBadResponse'))) {
         response = {'myTable': null };
-    } else if (params.RequestItems.hasOwnProperty('errorWithOneRetry')) {
+    } else if (Object.prototype.hasOwnProperty.call(params.RequestItems, 'errorWithOneRetry')) {
         if (nbRetry === 0) {
             nbRetry++;
             const err = new Error('Error !');
@@ -160,6 +160,25 @@ AWS.mock('DynamoDB.DocumentClient', 'put', function (params, callback) {
     }
 
 	callback(null);
+});
+
+
+AWS.mock('DynamoDB.DocumentClient', 'update', function (params, callback) {
+    if (params.TableName === 'error') {
+        return callback(new Error('Error from Dynamo'))
+    } else if (params.TableName === 'errorWithRetry') {
+        const err = new Error('Error from Dynamo');
+        err.retryable = true;
+        return callback(err);
+    } else if (params.TableName === 'errorWithOneRetry') {
+        if (nbRetry === 0) {
+            nbRetry++;
+            const err = new Error('Error !');
+            err.retryable = true;
+            return callback(err)
+        }
+    }
+   callback(null)
 });
 
 describe('queryHashKey', () => {
@@ -490,3 +509,171 @@ describe('getItem', () => {
         }
     })
 })
+
+describe('updateItem', () => {
+    let dynamoTools;
+
+    beforeEach(() => {
+        nbRetry = 0;
+        const awsUtils = require('../index').dynamo;
+
+        const aws = require('aws-sdk');
+        aws.config.update({region: 'eu-west-1'});
+        const dynamoCli = new aws.DynamoDB.DocumentClient();
+        dynamoTools = new awsUtils(dynamoCli);
+    });
+
+    it('Normal case', async () => {
+        const res = await dynamoTools.updateItem('myTable', {});
+        expect(res).toBeUndefined()
+    });
+
+    it('Should throw an error', async () => {
+        try {
+            await dynamoTools.updateItem('error', {'key': 'value'});
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('Error from Dynamo');
+        }
+    });
+
+    it('Should retry but throw an error', async () => {
+        try {
+            await dynamoTools.updateItem('errorWithRetry', {'key': 'value'});
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('Error from Dynamo');
+        }
+    });
+
+    it('Should retry, then fail one time then get data', async () => {
+        const res = await dynamoTools.updateItem('errorWithOneRetry', {'key': 'value'});
+        expect(res).toEqual(undefined);
+    });
+
+    it('Should fail cause bad params', async () => {
+        try {
+            await dynamoTools.updateItem('errorWithOneRetry', '');
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('BAD_PARAM');
+        }
+
+        try {
+            await dynamoTools.updateItem(null, {});
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('BAD_PARAM');
+        }
+    })
+});
+
+describe('query', () => {
+    let dynamoTools;
+
+    beforeEach(() => {
+        nbRetry = 0;
+        const awsUtils = require('../index').dynamo;
+
+        const aws = require('aws-sdk');
+        aws.config.update({region: 'eu-west-1'});
+        const dynamoCli = new aws.DynamoDB.DocumentClient();
+        dynamoTools = new awsUtils(dynamoCli);
+    });
+
+    it('Normal case', async () => {
+        const obj = {
+            conditions: [
+                {
+                    key: 'id',
+                    operator: 'BETWEEN',
+                    value: [0,5]
+                }
+            ]
+        };
+        const res = await dynamoTools.query('myTable', obj);
+        expect(res.Items.length).toEqual(2);
+        expect(res.Items[0].id).toEqual(1);
+    });
+
+    it('Should throw an error', async () => {
+        try {
+            const obj = {
+                conditions: [
+                    {
+                        key: 'id',
+                        operator: 'BETWEEN',
+                        value: [0,5]
+                    }
+                ]
+            };
+            await dynamoTools.query('error', obj);
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('Error from Dynamo');
+        }
+    })
+
+    it('Should retry but throw an error', async () => {
+        try {
+            const obj = {
+                conditions: [
+                    {
+                        key: 'id',
+                        operator: 'BETWEEN',
+                        value: [0,5]
+                    }
+                ]
+            };
+            await dynamoTools.query('errorWithRetry', obj);
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('Error from Dynamo');
+        }
+    }, 10000)
+
+    it('Should retry, then fail one time then get data', async () => {
+        const obj = {
+            conditions: [
+                {
+                    key: 'id',
+                    operator: 'BETWEEN',
+                    value: [0,5]
+                }
+            ]
+        };
+        const res = await dynamoTools.query('errorWithOneRetry', obj);
+        expect(res.Items.length).toEqual(1);
+        expect(res.Items[0].id).toEqual(2)
+    })
+
+    it('Should fail cause bad params', async () => {
+        try {
+            await dynamoTools.query('errorWithOneRetry', 'key');
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('BAD_PARAM');
+        }
+
+        try {
+            await dynamoTools.query(null, 'key', 'value');
+            throw new Error('This test should fail !');
+        } catch (err) {
+            expect(err.message).toEqual('BAD_PARAM');
+        }
+    })
+
+    it('Should handle strange cases when no Items property is found', async () => {
+        const obj = {
+            conditions: [
+                {
+                    key: 'id',
+                    operator: 'BETWEEN',
+                    value: [0,5]
+                }
+            ]
+        };
+        const res = await dynamoTools.query('noItems', obj);
+        expect(res.Items.length).toEqual(0);
+    })
+});
