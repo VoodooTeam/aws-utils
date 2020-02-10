@@ -103,7 +103,7 @@ class DynamoTools {
                 if (err) {
                     if (err.retryable) {
                         try {
-                            const data = await utils.retry(this.cli.query.bind(this.cli), [params], this.retryMax);
+                            const data = await utils.retry(this.cli.query.bind(this.cli), [params], true, this.retryMax);
 
                             if(!data.Items) return resolve(response);
                             for(const item of data.Items) {
@@ -355,30 +355,25 @@ class DynamoTools {
                 param.ExpressionAttributeValues[`:${key}`] = params.add[key]
             }
 
+            const errObj = {
+                from: CLASS_NAME,
+                params: {
+                    dynamo_table: dynamoTable,
+                    entry_param: params
+                }
+            };
             this.cli.update(param, async (err) => {
                 if (err) {
                     if (err.retryable) {
                         try {
-                            await utils.retry(this.cli.update.bind(this.cli), [param], this.retryMax);
+                            await utils.retry(this.cli.update.bind(this.cli), [param], true, this.retryMax);
                             return resolve()
                         } catch (err) {
-                            err.more_infos_updateItem = {
-                                from: CLASS_NAME,
-                                params:{
-                                    dynamo_table: dynamoTable,
-                                    entry_param: params
-                                }
-                            };
+                            err.more_infos_updateItem = errObj;
                             return reject(err)
                         }
                     }
-                    err.more_infos_updateItem = {
-                        from: CLASS_NAME,
-                        params: {
-                            dynamo_table: dynamoTable,
-                            entry_param: params
-                        }
-                    };
+                    err.more_infos_updateItem = errObj;
                     return reject(err)
                 }
 
