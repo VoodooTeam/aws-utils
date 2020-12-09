@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "test": "NODE_ENV=test ./node_modules/.bin/jest",
-    "lint": "./node_modules/.bin/eslint -c ./.eslintrc ./"
+    "linter": "./node_modules/.bin/eslint -c ./.eslintrc ./"
   },
   "engines": {
     "node": ">=7.6.0"
