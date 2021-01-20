@@ -82,6 +82,12 @@ const res = await dynamoTools.scan('myTable');
 const res = await dynamoTools.putItem('myTable', {'key': 'value'});
 ```
 
+### Put items
+
+```javascript
+const res = await dynamoTools.putItems('myTable', [{'key': 'value'}]);
+```
+
 ### Update item
 
 ```javascript
@@ -111,6 +117,11 @@ const res = await dynamoTools.deleteItem('myTable', {'key': 'value'});
 
 * `dynamoTable` : table's name
 * `item` : item to insert
+
+#### putItems(dynamoTable, items)
+
+* `dynamoTable` : table's name
+* `item` : an array of items to insert
 
 #### scan(dynamoTable, [hashKeyName], [hashKeyValue], [exclusiveStartKey], [limit])
 
