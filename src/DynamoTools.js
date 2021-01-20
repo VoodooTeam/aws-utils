@@ -180,6 +180,58 @@ class DynamoTools {
         })
     }
 
+
+    /**
+     * This function will put a batch of item to dynamoDB
+     *
+     * @param {string} dynamoTable - The name of the dynamoDB table
+     * @param {object} items - The items to push to dynamo DB
+     */
+    putItems(dynamoTable, items) {
+        const errObj = {
+            from: CLASS_NAME,
+            params: {
+                function_name: 'putItems',
+                dynamo_table: dynamoTable,
+                items: items
+            }
+        };
+
+        return new Promise((resolve, reject) => {
+
+            if (typeof dynamoTable !== 'string' || typeof items !== 'object' || !Array.isArray(items)) {
+                const myErr = new Error('BAD_PARAM');
+                myErr.moreInfo = errObj;
+                return reject(myErr);
+            }
+
+            const param = {
+                RequestItems: {
+                    [dynamoTable]: items
+                }
+            };
+
+            this.cli.batchWrite(param, async (err) => {
+                if (err) {
+                    err.moreInfo = errObj;
+
+                    if (err.retryable) {
+                        try {
+                            await utils.retry(this.cli.batchWrite.bind(this.cli), [param], true, this.retryMax);
+                            return resolve();
+                        } catch (err) {
+                            err.moreInfo = errObj;
+                        }
+                    }
+
+                    return reject(err);
+                }
+
+                return resolve();
+            })
+        })
+    }
+
     /**
      * Scan a specific hashkey in dynamoDB
      * If no hashKeyName is provided, it scans all the talble
