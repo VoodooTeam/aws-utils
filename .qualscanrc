@@ -1,3 +1,13 @@
 {
-    "code-duplication": "--ignore ./tests/**,./node_modules/**,./coverage/** --threshold 2"
+    "code-duplication": "--ignore ./tests/**,./node_modules/**,./coverage/** --threshold 2",
+    "require-time": {
+        "budget": {
+            "fail": { "entrypointTime": 700000000 }
+        }
+    },
+    "dependencies-size": {
+        "budget": {
+            "fail": { "weight": 200000000, "directDependencies": 10, "dependencies": 100 }
+        }
+    }
 }
