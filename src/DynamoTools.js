@@ -65,6 +65,11 @@ class DynamoTools {
                 TableName: dynamoTable
             };
 
+            // parameters used to query over a specific index
+            if(customParams.IndexName) {
+                params.IndexName = customParams.IndexName
+            }
+
             if(startKey) params.ExclusiveStartKey = startKey;
             let keyCondition = '';
             let keyAttribute = {};
