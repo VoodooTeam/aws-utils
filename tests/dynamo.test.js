@@ -674,7 +674,8 @@ describe('query', () => {
                     operator: 'BETWEEN',
                     value: [0,5]
                 }
-            ]
+            ],
+            IndexName: 'TEST-INDEX'
         };
         const res = await dynamoTools.query('myTable', obj);
         expect(res.Items.length).toEqual(2);
