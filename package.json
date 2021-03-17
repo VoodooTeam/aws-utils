@@ -1,6 +1,6 @@
 {
   "name": "@voodoo.io/aws-utils",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "description": "AWS utils methods - using homemade retry system",
   "main": "index.js",
   "bin": "./index.js",
