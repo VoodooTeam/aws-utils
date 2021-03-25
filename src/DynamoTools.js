@@ -202,6 +202,7 @@ class DynamoTools {
             }
         };
 
+
         return new Promise((resolve, reject) => {
 
             if (typeof dynamoTable !== 'string' || typeof items !== 'object' || !Array.isArray(items)) {
@@ -216,7 +217,9 @@ class DynamoTools {
                 }
             };
 
-            this.cli.batchWrite(param, async (err) => {
+
+            this.cli.batchWrite(param, async (err,data) => {
+
                 if (err) {
                     err.moreInfo = errObj;
 
@@ -230,9 +233,18 @@ class DynamoTools {
                     }
 
                     return reject(err);
-                }
+                } else {
 
-                return resolve();
+                    let returnedParams = {};
+                    returnedParams.RequestItems = data.UnprocessedItems;
+
+                    // re-run the method as all items have not been written
+                    if( Object.keys(returnedParams.RequestItems).length !== 0) {
+                        this.cli.batchWrite(returnedParams) // TODO where is callback ?
+                    } else {
+                        return resolve();
+                    }
+                }
             })
         })
     }
@@ -284,12 +296,26 @@ class DynamoTools {
                 }
             };
 
+            let accumulData = [];
+
             this.cli.batchGet(param, async (err, data) => {
                 if (err) {
                     if (err.retryable) {
                         try {
+
                             const data = await utils.retry(this.cli.batchGet.bind(this.cli), [param], true, this.retryMax);
-                            return resolve(this._formatRes(data, dynamoTable));
+                            accumulData.push(... this._formatRes(data, dynamoTable))
+
+                            let returnedParams = {};
+                            returnedParams.RequestItems = data.UnprocessedItems;
+
+                            // re-run the method batchGet
+                            if(Object.keys(returnedParams.RequestItems).length !== 0) {
+                                this.cli.batchGet(returnedParams)  // TODO: how to pass the callback here (implicitly ) ?
+                            } else {
+                                return resolve(this._formatRes(data, dynamoTable));
+                            }
+
                         } catch (err) {
                             err.moreInfo = errObj;
                             return reject(err)
