@@ -230,11 +230,10 @@ class DynamoTools {
 
                     if (err.retryable) {
                         try {
-                            const data = await utils.retry(this.cli.batchWrite.bind(this.cli), [param], true, this.retryMax);
+                                const data = await utils.retry(this.cli.batchWrite.bind(this.cli), [param], true, this.retryMax);
 
-                            if( Object.prototype.hasOwnProperty.call(data, 'Responses')) {
                                 let returnedParams = {};
-                                returnedParams.RequestItems = data.Responses.UnprocessedItems;
+                                returnedParams.RequestItems = data.UnprocessedItems;
 
                                 if (Object.keys(returnedParams.RequestItems).length !== 0) {
                                     if (recursiveCallCount > threshold) {
@@ -243,12 +242,9 @@ class DynamoTools {
                                         recursiveCallCount += 1
                                         this.cli.batchWrite(returnedParams, callBackRetry)
                                     }
-                                } else {
-                                    return resolve();
                                 }
-                            } else {
                                 return resolve();
-                            }
+
                         } catch (err) {
                             err.moreInfo = errObj;
                         }
@@ -256,10 +252,8 @@ class DynamoTools {
                     return reject(err);
 
                 } else {
-
-                    if( Object.prototype.hasOwnProperty.call(data, 'Responses')) {
                         let returnedParams = {};
-                        returnedParams.RequestItems = data.Responses.UnprocessedItems;
+                        returnedParams.RequestItems = data.UnprocessedItems;
 
                         if (Object.keys(returnedParams.RequestItems).length !== 0) {
                             if (recursiveCallCount > threshold) {
@@ -268,12 +262,9 @@ class DynamoTools {
                                 recursiveCallCount += 1
                                 this.cli.batchWrite(returnedParams, callBackRetry)
                             }
-                        } else {
-                            return resolve();
                         }
-                    } else {
-                        return resolve();
-                    }
+
+                    return resolve();
                 }
             };
 
@@ -391,10 +382,8 @@ class DynamoTools {
 
                             accumulData.push( [this._formatRes(data, dynamoTable), nestedCallIdx] )
 
-                            if( Object.prototype.hasOwnProperty.call(data, 'Responses')) {
-
                                 let returnedParams = {};
-                                returnedParams.UnprocessedKeys = data.Responses.UnprocessedKeys;
+                                returnedParams.UnprocessedKeys = data.UnprocessedKeys;
 
                                 if(Object.keys(returnedParams.UnprocessedKeys).length !== 0) {
                                     if(nestedCallIdx < threshold) {
@@ -402,10 +391,7 @@ class DynamoTools {
                                     } else {
                                         throw new Error(`getItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
                                     }
-                                } else {
-                                    return resolve( this._flattenResult(accumulData) );
                                 }
-                            }
 
                             return resolve( this._flattenResult(accumulData) );
                         } catch (err) {
@@ -419,21 +405,17 @@ class DynamoTools {
 
                     accumulData.push( [this._formatRes(data, dynamoTable), nestedCallIdx] )
 
-                    if( Object.prototype.hasOwnProperty.call(data, 'Responses')) {
+                    let returnedParams = {};
+                    returnedParams.RequestItems = data.UnprocessedKeys;
 
-                        let returnedParams = {};
-                        returnedParams.RequestItems = data.Responses.UnprocessedKeys;
-
-                        if (Object.keys(returnedParams.RequestItems).length !== 0) {
-                            if (nestedCallIdx < threshold) {
+                    if (Object.keys(returnedParams.RequestItems).length !== 0) {
+                        if (nestedCallIdx < threshold) {
                                 this.cli.batchGet(returnedParams, callbackRetry)
                             } else {
                                 throw new Error(`getItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
                             }
-                        } else {
-                            return resolve( this._flattenResult(accumulData) );
-                        }
-                    }
+                        } else
+
                     return resolve( this._flattenResult(accumulData) );
                 }
             }

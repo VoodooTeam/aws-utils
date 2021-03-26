@@ -70,8 +70,7 @@ AWS.mock('DynamoDB.DocumentClient', 'batchGet', function (params, callback) {
         }];
 
         response = {
-            'myTable': res,
-            UnprocessedKeys: {}
+            'myTable': res
         };
 	} else if (Object.prototype.hasOwnProperty.call(params.RequestItems, 'error')) {
         return callback(new Error('Error from Dynamo'));
@@ -80,7 +79,7 @@ AWS.mock('DynamoDB.DocumentClient', 'batchGet', function (params, callback) {
         err.retryable = true;
         return callback(err);
     } else if ((Object.prototype.hasOwnProperty.call(params.RequestItems, 'errorBadResponse'))) {
-        response = {'myTable': null , UnprocessedKeys: {} };
+        response = {'myTable': null };
     } else if (Object.prototype.hasOwnProperty.call(params.RequestItems, 'errorWithOneRetry')) {
         if (nbRetry === 0) {
             nbRetry++;
@@ -93,10 +92,10 @@ AWS.mock('DynamoDB.DocumentClient', 'batchGet', function (params, callback) {
 			id: 2
         }];
 
-        response = {'errorWithOneRetry': res,  UnprocessedKeys: {} };
+        response = {'errorWithOneRetry': res };
     }
 
-	callback(null, { 'Responses': response});
+	callback(null, { 'Responses': response, 'UnprocessedKeys': {} });
 });
 
 AWS.mock('DynamoDB.DocumentClient', 'batchWrite', function (params, callback) {
@@ -104,8 +103,7 @@ AWS.mock('DynamoDB.DocumentClient', 'batchWrite', function (params, callback) {
 
     if (Object.prototype.hasOwnProperty.call(params.RequestItems, 'myTable')) {
         response = {
-            'myTable': true,
-            UnprocessedItems: {}
+            'myTable': true
         };
 
     } else if (Object.prototype.hasOwnProperty.call(params.RequestItems, 'error')) {
@@ -115,7 +113,7 @@ AWS.mock('DynamoDB.DocumentClient', 'batchWrite', function (params, callback) {
         err.retryable = true;
         return callback(err);
     } else if ((Object.prototype.hasOwnProperty.call(params.RequestItems, 'errorBadResponse'))) {
-        response = {'myTable': null, UnprocessedItems: {} };
+        response = {'myTable': null };
     } else if (Object.prototype.hasOwnProperty.call(params.RequestItems, 'errorWithOneRetry')) {
         if (nbRetry === 0) {
             nbRetry++;
@@ -123,10 +121,10 @@ AWS.mock('DynamoDB.DocumentClient', 'batchWrite', function (params, callback) {
             err.retryable = true;
             return callback(err);
         }
-        response = {'errorWithOneRetry': true , UnprocessedItems: {}};
+        response = {'errorWithOneRetry': true };
     }
 
-    callback(null, { 'Responses': response});
+    callback(null, { 'Responses': response, 'UnprocessedItems': {} } );
 });
 
 AWS.mock('DynamoDB.DocumentClient', 'transactWrite', function (params, callback) {
@@ -277,7 +275,6 @@ AWS.mock('DynamoDB.DocumentClient', 'update', function (params, callback) {
     }
    callback(null)
 });
-
 
 
 
