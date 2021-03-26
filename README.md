@@ -18,14 +18,12 @@ Simple wrapper around aws-sdk to make it easier to use.
 
 **/!\ This module use async/await syntax, this is why you must have node 7.6+.**
 
-Supported and tested : >= 7.6
+Supported and tested : >= 12.x
 
 | Version       | Supported     | Tested         |
 | ------------- |:-------------:|:--------------:|
-| 10.x          | yes           | yes            |
-| 9.x           | yes           | yes            |
-| 8.x           | yes           | yes            |
-| >= 7.6        | yes           | yes            |
+| 14.x          | yes           | yes            |
+| 12.x          | yes           | yes            |
 
 
 **BREAKING CHANGES since version 2.0**
@@ -86,6 +84,12 @@ const res = await dynamoTools.putItem('myTable', {'key': 'value'});
 
 ```javascript
 const res = await dynamoTools.putItems('myTable', [{'key': 'value'}]);
+```
+
+### Put transactional items
+
+```javascript
+const res = await dynamoTools.putTransactionItems([{'key': 'value'}]);
 ```
 
 ### Update item
