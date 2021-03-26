@@ -237,7 +237,7 @@ class DynamoTools {
 
                                 if (Object.keys(returnedParams.RequestItems).length !== 0) {
                                     if (recursiveCallCount > threshold) {
-                                        throw new Error(`putItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
+                                        reject(new Error(`putItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`))
                                     } else {
                                         recursiveCallCount += 1
                                         this.cli.batchWrite(returnedParams, callBackRetry)
@@ -257,7 +257,7 @@ class DynamoTools {
 
                         if (Object.keys(returnedParams.RequestItems).length !== 0) {
                             if (recursiveCallCount > threshold) {
-                                throw new Error(`putItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
+                                reject(new Error(`putItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`))
                             } else {
                                 recursiveCallCount += 1
                                 this.cli.batchWrite(returnedParams, callBackRetry)
@@ -389,7 +389,7 @@ class DynamoTools {
                                     if(nestedCallIdx < threshold) {
                                         this.cli.batchGet(returnedParams, callbackRetry)
                                     } else {
-                                        throw new Error(`getItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
+                                        reject(new Error(`getItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`))
                                     }
                                 }
 
@@ -412,7 +412,7 @@ class DynamoTools {
                         if (nestedCallIdx < threshold) {
                                 this.cli.batchGet(returnedParams, callbackRetry)
                             } else {
-                                throw new Error(`getItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
+                                reject(new Error(`getItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`))
                             }
                         } else
 
