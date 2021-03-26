@@ -468,13 +468,13 @@ class DynamoTools {
             };
 
 
-            this.cli.getTransactionItems(param, async (err, data) => {
+            this.cli.transactGet(param, async (err, data) => {
 
                 if (err) {
                     if (err.retryable) {
                         try {
-                            const data = await utils.retry(this.cli.getTransactionItems.bind(this.cli), [param], true, this.retryMax);
-                            return resolve(data.Responses);
+                            const data = await utils.retry(this.cli.transactGet.bind(this.cli), [param], true, this.retryMax);
+                            return resolve(this._formatResTransac(data));
 
                         } catch (err) {
                             err.moreInfo = errObj;
@@ -484,7 +484,7 @@ class DynamoTools {
                     err.moreInfo = errObj;
                     return reject(err)
                 }
-                return resolve(data.Responses);
+                return resolve(this._formatResTransac(data));
             })
         })
     }
@@ -495,6 +495,13 @@ class DynamoTools {
         if (Object.prototype.hasOwnProperty.call(data, 'Responses') &&
           Object.prototype.hasOwnProperty.call(data.Responses, dynamoTable) &&
           Array.isArray(data.Responses[dynamoTable])) return data.Responses[dynamoTable];
+        return [];
+    }
+
+    _formatResTransac(data) {
+
+        if (Object.prototype.hasOwnProperty.call(data, 'Responses') && Array.isArray(data.Responses))
+            return data.Responses;
         return [];
     }
 
