@@ -231,7 +231,6 @@ class DynamoTools {
                             err.moreInfo = errObj;
                         }
                     }
-
                     return reject(err);
                 } else {
 
@@ -249,8 +248,12 @@ class DynamoTools {
         })
     }
 
-
-    putTransactionItems(transactionItems, otherParams=undefined) {
+    /**
+     *
+     * @param transactionItems
+     * @returns {Promise<unknown>}
+     */
+    putTransactionItems(transactionItems) {
         const errObj = {
             from: CLASS_NAME,
             params: {
@@ -259,10 +262,9 @@ class DynamoTools {
             }
         };
 
-
         return new Promise((resolve, reject) => {
 
-            if (typeof otherParams !== 'object' || typeof transactionItems !== 'object' || !Array.isArray(transactionItems)) {
+            if (typeof transactionItems !== 'object' || !Array.isArray(transactionItems)) {
                 const myErr = new Error('BAD_PARAM');
                 myErr.moreInfo = errObj;
                 return reject(myErr);
@@ -273,32 +275,22 @@ class DynamoTools {
             };
 
 
-            this.cli.batchWrite(param, async (err,data) => {
+            this.cli.transactWrite(param, async (err) => {
 
                 if (err) {
                     err.moreInfo = errObj;
 
                     if (err.retryable) {
                         try {
-                            await utils.retry(this.cli.batchWrite.bind(this.cli), [param], true, this.retryMax);
+                            await utils.retry(this.cli.transactWrite.bind(this.cli), [param], true, this.retryMax);
                             return resolve();
                         } catch (err) {
                             err.moreInfo = errObj;
                         }
                     }
-
                     return reject(err);
                 } else {
-
-                    let returnedParams = {};
-                    returnedParams.RequestItems = data.UnprocessedItems;
-
-                    // re-run the method as all items have not been written
-                    if( Object.keys(returnedParams.RequestItems).length !== 0) {
-                        this.cli.batchWrite(returnedParams) // TODO where is callback ?
-                    } else {
-                        return resolve();
-                    }
+                    return resolve();
                 }
             })
         })
@@ -353,7 +345,7 @@ class DynamoTools {
 
             let accumulData = [];
 
-            this.cli.batchGet(param, async (err, data) => {
+            this.cli.batchGet(param, async (err) => {
                 if (err) {
                     if (err.retryable) {
                         try {
@@ -362,13 +354,13 @@ class DynamoTools {
                             accumulData.push(... this._formatRes(data, dynamoTable))
 
                             let returnedParams = {};
-                            returnedParams.RequestItems = data.UnprocessedItems;
+                            returnedParams.RequestItems = data.UnprocessedItems; // is it ok ?
 
                             // re-run the method batchGet
                             if(Object.keys(returnedParams.RequestItems).length !== 0) {
                                 this.cli.batchGet(returnedParams)  // TODO: how to pass the callback here (implicitly ) ?
                             } else {
-                                return resolve(this._formatRes(data, dynamoTable));
+                                return resolve(accumulData);
                             }
 
                         } catch (err) {
@@ -380,30 +372,23 @@ class DynamoTools {
                     return reject(err)
                 }
 
-                return resolve(this._formatRes(data, dynamoTable));
+                return resolve(accumulData);
             })
         })
     }
 
 
-    /**
-     * This function will get an array of items from dynamoDB
-     *
-     * @param {string} dynamoTable - The name of the dynamoDB table
-     * @param {array} partitionKeys - An array of partition keys
-     */
-    getTransactionItems(dynamoTable, transactionItems) {
+    getTransactionItems(transactionItems) {
         const errObj = {
             from: CLASS_NAME,
             params: {
                 function_name: 'getTransactionItems',
-                dynamo_table: dynamoTable,
                 transaction_items: transactionItems
             }
         };
 
         return new Promise((resolve, reject) => {
-            if (typeof dynamoTable !== 'string' || typeof partitionKeys !== 'object' || !Array.isArray(transactionItems)) {
+            if (typeof transactionItems !== 'object' || !Array.isArray(transactionItems)) {
                 let myErr = new Error('BAD_PARAM');
                 myErr.moreInfo = errObj;
                 return reject(myErr)
@@ -420,7 +405,7 @@ class DynamoTools {
                     if (err.retryable) {
                         try {
                             const data = await utils.retry(this.cli.getTransactionItems.bind(this.cli), [param], true, this.retryMax);
-                            return resolve(this._formatRes(data, dynamoTable));
+                            return resolve(data.Responses);
 
                         } catch (err) {
                             err.moreInfo = errObj;
@@ -430,7 +415,7 @@ class DynamoTools {
                     err.moreInfo = errObj;
                     return reject(err)
                 }
-                return resolve(this._formatRes(data, dynamoTable));
+                return resolve(data.Responses);
             })
         })
     }
