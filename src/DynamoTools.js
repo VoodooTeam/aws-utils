@@ -187,12 +187,14 @@ class DynamoTools {
 
 
     /**
-     * This function will put a batch of item to dynamoDB
+     * This function will put a batch of items to dynamoDB.
      *
-     * @param {string} dynamoTable - The name of the dynamoDB table
-     * @param {object} items - The items to push to dynamo DB
+     * @param dynamoTable
+     * @param items
+     * @param threshold
+     * @returns {Promise<unknown>}
      */
-    putItems(dynamoTable, items) {
+    putItems(dynamoTable, items, threshold=50) {
         const errObj = {
             from: CLASS_NAME,
             params: {
@@ -201,6 +203,7 @@ class DynamoTools {
                 items: items
             }
         };
+
 
         return new Promise((resolve, reject) => {
 
@@ -216,23 +219,103 @@ class DynamoTools {
                 }
             };
 
-            this.cli.batchWrite(param, async (err) => {
+            // count how many recursive calls are done while retrying
+            let recursiveCallCount = 0
+
+            // callback to execute
+            const callBackRetry = async (err,data) => {
+
                 if (err) {
                     err.moreInfo = errObj;
 
                     if (err.retryable) {
                         try {
-                            await utils.retry(this.cli.batchWrite.bind(this.cli), [param], true, this.retryMax);
+                                const data = await utils.retry(this.cli.batchWrite.bind(this.cli), [param], true, this.retryMax);
+
+                                let returnedParams = {};
+                                returnedParams.RequestItems = data.UnprocessedItems;
+
+                                if (Object.keys(returnedParams.RequestItems).length !== 0) {
+                                    if (recursiveCallCount > threshold) {
+                                        throw new Error(`putItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
+                                    } else {
+                                        recursiveCallCount += 1
+                                        this.cli.batchWrite(returnedParams, callBackRetry)
+                                    }
+                                }
+                                return resolve();
+
+                        } catch (err) {
+                            err.moreInfo = errObj;
+                        }
+                    }
+                    return reject(err);
+
+                } else {
+                        let returnedParams = {};
+                        returnedParams.RequestItems = data.UnprocessedItems;
+
+                        if (Object.keys(returnedParams.RequestItems).length !== 0) {
+                            if (recursiveCallCount > threshold) {
+                                throw new Error(`putItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
+                            } else {
+                                recursiveCallCount += 1
+                                this.cli.batchWrite(returnedParams, callBackRetry)
+                            }
+                        }
+
+                    return resolve();
+                }
+            };
+
+            this.cli.batchWrite(param, callBackRetry)
+        })
+    }
+
+    /**
+     *
+     * @param transactionItems
+     * @returns {Promise<unknown>}
+     */
+    putTransactionItems(transactionItems) {
+        const errObj = {
+            from: CLASS_NAME,
+            params: {
+                function_name: 'putTransactionItems',
+                transaction_items: transactionItems
+            }
+        };
+
+        return new Promise((resolve, reject) => {
+
+            if (typeof transactionItems !== 'object' || !Array.isArray(transactionItems)) {
+                const myErr = new Error('BAD_PARAM');
+                myErr.moreInfo = errObj;
+                return reject(myErr);
+            }
+
+            const param = {
+                TransactItems: transactionItems
+            };
+
+
+            this.cli.transactWrite(param, async (err) => {
+
+                if (err) {
+                    err.moreInfo = errObj;
+
+                    if (err.retryable) {
+                        try {
+                            await utils.retry(this.cli.transactWrite.bind(this.cli), [param], true, this.retryMax);
                             return resolve();
                         } catch (err) {
                             err.moreInfo = errObj;
                         }
                     }
-
                     return reject(err);
+                } else {
+                    return resolve();
                 }
-
-                return resolve();
             })
         })
     }
@@ -259,7 +342,8 @@ class DynamoTools {
     * @param {string} dynamoTable - The name of the dynamoDB table
     * @param {array} partitionKeys - An array of partition keys
     */
-    getItems(dynamoTable, partitionKeys) {
+    getItems(dynamoTable, partitionKeys, threshold=100) {
+
         const errObj = {
             from: CLASS_NAME,
             params: {
@@ -284,12 +368,96 @@ class DynamoTools {
                 }
             };
 
-            this.cli.batchGet(param, async (err, data) => {
+            // accumulate data at each nested calls in the format ( [data_at_call_i], index_call_i )
+            // throw error if index_call_i > threshold
+            let accumulData = [];
+            let nestedCallIdx = 0;
+
+            const callbackRetry = async (err, data) => {
+
                 if (err) {
                     if (err.retryable) {
                         try {
                             const data = await utils.retry(this.cli.batchGet.bind(this.cli), [param], true, this.retryMax);
-                            return resolve(this._formatRes(data, dynamoTable));
+
+                            accumulData.push( [this._formatRes(data, dynamoTable), nestedCallIdx] )
+
+                                let returnedParams = {};
+                                returnedParams.UnprocessedKeys = data.UnprocessedKeys;
+
+                                if(Object.keys(returnedParams.UnprocessedKeys).length !== 0) {
+                                    if(nestedCallIdx < threshold) {
+                                        this.cli.batchGet(returnedParams, callbackRetry)
+                                    } else {
+                                        throw new Error(`getItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
+                                    }
+                                }
+
+                            return resolve( this._flattenResult(accumulData) );
+                        } catch (err) {
+                            err.moreInfo = errObj;
+                            return reject(err)
+                        }
+                    }
+                    err.moreInfo = errObj;
+                    return reject(err)
+                } else {
+
+                    accumulData.push( [this._formatRes(data, dynamoTable), nestedCallIdx] )
+
+                    let returnedParams = {};
+                    returnedParams.RequestItems = data.UnprocessedKeys;
+
+                    if (Object.keys(returnedParams.RequestItems).length !== 0) {
+                        if (nestedCallIdx < threshold) {
+                                this.cli.batchGet(returnedParams, callbackRetry)
+                            } else {
+                                throw new Error(`getItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
+                            }
+                        } else
+
+                    return resolve( this._flattenResult(accumulData) );
+                }
+            }
+
+            this.cli.batchGet(param, callbackRetry)
+        })
+    }
+
+    _flattenResult(accumulatedData) {
+            return accumulatedData.map(elem => elem[0]).flat()
+    }
+
+
+    getTransactionItems(transactionItems) {
+        const errObj = {
+            from: CLASS_NAME,
+            params: {
+                function_name: 'getTransactionItems',
+                transaction_items: transactionItems
+            }
+        };
+
+        return new Promise((resolve, reject) => {
+            if (typeof transactionItems !== 'object' || !Array.isArray(transactionItems)) {
+                let myErr = new Error('BAD_PARAM');
+                myErr.moreInfo = errObj;
+                return reject(myErr)
+            }
+
+            const param = {
+                TransactItems: transactionItems
+            };
+
+
+            this.cli.transactGet(param, async (err, data) => {
+
+                if (err) {
+                    if (err.retryable) {
+                        try {
+                            const data = await utils.retry(this.cli.transactGet.bind(this.cli), [param], true, this.retryMax);
+                            return resolve(this._formatResTransac(data));
+
                         } catch (err) {
                             err.moreInfo = errObj;
                             return reject(err)
@@ -298,17 +466,24 @@ class DynamoTools {
                     err.moreInfo = errObj;
                     return reject(err)
                 }
-
-                return resolve(this._formatRes(data, dynamoTable));
+                return resolve(this._formatResTransac(data));
             })
         })
     }
+
 
     _formatRes(data, dynamoTable) {
 
         if (Object.prototype.hasOwnProperty.call(data, 'Responses') &&
           Object.prototype.hasOwnProperty.call(data.Responses, dynamoTable) &&
           Array.isArray(data.Responses[dynamoTable])) return data.Responses[dynamoTable];
+        return [];
+    }
+
+    _formatResTransac(data) {
+
+        if (Object.prototype.hasOwnProperty.call(data, 'Responses') && Array.isArray(data.Responses))
+            return data.Responses;
         return [];
     }
 
