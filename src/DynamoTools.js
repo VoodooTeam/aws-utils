@@ -187,12 +187,14 @@ class DynamoTools {
 
 
     /**
-     * This function will put a batch of item to dynamoDB
+     * This function will put a batch of items to dynamoDB.
      *
-     * @param {string} dynamoTable - The name of the dynamoDB table
-     * @param {object} items - The items to push to dynamo DB
+     * @param dynamoTable
+     * @param items
+     * @param threshold
+     * @returns {Promise<unknown>}
      */
-    putItems(dynamoTable, items) {
+    putItems(dynamoTable, items, threshold=50) {
         const errObj = {
             from: CLASS_NAME,
             params: {
@@ -217,34 +219,65 @@ class DynamoTools {
                 }
             };
 
+            // count how many recursive calls are done while retrying
+            let recursiveCallCount = 0
 
-            this.cli.batchWrite(param, async (err,data) => {
+            // callback to execute
+            const callBackRetry = async (err,data) => {
 
                 if (err) {
                     err.moreInfo = errObj;
 
                     if (err.retryable) {
                         try {
-                            await utils.retry(this.cli.batchWrite.bind(this.cli), [param], true, this.retryMax);
-                            return resolve();
+                            const data = await utils.retry(this.cli.batchWrite.bind(this.cli), [param], true, this.retryMax);
+
+                            if( Object.prototype.hasOwnProperty.call(data, 'Responses')) {
+                                let returnedParams = {};
+                                returnedParams.RequestItems = data.Responses.UnprocessedItems;
+
+                                if (Object.keys(returnedParams.RequestItems).length !== 0) {
+                                    if (recursiveCallCount > threshold) {
+                                        throw new Error(`putItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
+                                    } else {
+                                        recursiveCallCount += 1
+                                        this.cli.batchWrite(returnedParams, callBackRetry)
+                                    }
+                                } else {
+                                    return resolve();
+                                }
+                            } else {
+                                return resolve();
+                            }
                         } catch (err) {
                             err.moreInfo = errObj;
                         }
                     }
                     return reject(err);
+
                 } else {
 
-                    let returnedParams = {};
-                    returnedParams.RequestItems = data.UnprocessedItems;
+                    if( Object.prototype.hasOwnProperty.call(data, 'Responses')) {
+                        let returnedParams = {};
+                        returnedParams.RequestItems = data.Responses.UnprocessedItems;
 
-                    // re-run the method as all items have not been written
-                    if( Object.keys(returnedParams.RequestItems).length !== 0) {
-                        this.cli.batchWrite(returnedParams) // TODO where is callback ?
+                        if (Object.keys(returnedParams.RequestItems).length !== 0) {
+                            if (recursiveCallCount > threshold) {
+                                throw new Error(`putItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
+                            } else {
+                                recursiveCallCount += 1
+                                this.cli.batchWrite(returnedParams, callBackRetry)
+                            }
+                        } else {
+                            return resolve();
+                        }
                     } else {
                         return resolve();
                     }
                 }
-            })
+            };
+
+            this.cli.batchWrite(param, callBackRetry)
         })
     }
 
@@ -318,7 +351,8 @@ class DynamoTools {
     * @param {string} dynamoTable - The name of the dynamoDB table
     * @param {array} partitionKeys - An array of partition keys
     */
-    getItems(dynamoTable, partitionKeys) {
+    getItems(dynamoTable, partitionKeys, threshold=100) {
+
         const errObj = {
             from: CLASS_NAME,
             params: {
@@ -343,26 +377,37 @@ class DynamoTools {
                 }
             };
 
+            // accumulate data at each nested calls in the format ( [data_at_call_i], index_call_i )
+            // throw error if index_call_i > threshold
             let accumulData = [];
+            let nestedCallIdx = 0;
 
-            this.cli.batchGet(param, async (err) => {
+            const callbackRetry = async (err, data) => {
+
                 if (err) {
                     if (err.retryable) {
                         try {
-
                             const data = await utils.retry(this.cli.batchGet.bind(this.cli), [param], true, this.retryMax);
-                            accumulData.push(... this._formatRes(data, dynamoTable))
 
-                            let returnedParams = {};
-                            returnedParams.RequestItems = data.UnprocessedItems; // is it ok ?
+                            accumulData.push( [this._formatRes(data, dynamoTable), nestedCallIdx] )
 
-                            // re-run the method batchGet
-                            if(Object.keys(returnedParams.RequestItems).length !== 0) {
-                                this.cli.batchGet(returnedParams)  // TODO: how to pass the callback here (implicitly ) ?
-                            } else {
-                                return resolve(accumulData);
+                            if( Object.prototype.hasOwnProperty.call(data, 'Responses')) {
+
+                                let returnedParams = {};
+                                returnedParams.UnprocessedKeys = data.Responses.UnprocessedKeys;
+
+                                if(Object.keys(returnedParams.UnprocessedKeys).length !== 0) {
+                                    if(nestedCallIdx < threshold) {
+                                        this.cli.batchGet(returnedParams, callbackRetry)
+                                    } else {
+                                        throw new Error(`getItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
+                                    }
+                                } else {
+                                    return resolve( this._flattenResult(accumulData) );
+                                }
                             }
 
+                            return resolve( this._flattenResult(accumulData) );
                         } catch (err) {
                             err.moreInfo = errObj;
                             return reject(err)
@@ -370,11 +415,35 @@ class DynamoTools {
                     }
                     err.moreInfo = errObj;
                     return reject(err)
-                }
+                } else {
 
-                return resolve(accumulData);
-            })
+                    accumulData.push( [this._formatRes(data, dynamoTable), nestedCallIdx] )
+
+                    if( Object.prototype.hasOwnProperty.call(data, 'Responses')) {
+
+                        let returnedParams = {};
+                        returnedParams.RequestItems = data.Responses.UnprocessedKeys;
+
+                        if (Object.keys(returnedParams.RequestItems).length !== 0) {
+                            if (nestedCallIdx < threshold) {
+                                this.cli.batchGet(returnedParams, callbackRetry)
+                            } else {
+                                throw new Error(`getItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`)
+                            }
+                        } else {
+                            return resolve( this._flattenResult(accumulData) );
+                        }
+                    }
+                    return resolve( this._flattenResult(accumulData) );
+                }
+            }
+
+            this.cli.batchGet(param, callbackRetry)
         })
+    }
+
+    _flattenResult(accumulatedData) {
+            return accumulatedData.map(elem => elem[0]).flat()
     }
 
 
