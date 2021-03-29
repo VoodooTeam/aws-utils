@@ -240,7 +240,7 @@ class DynamoTools {
                                         reject(new Error(`putItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`))
                                     } else {
                                         recursiveCallCount += 1
-                                        this.cli.batchWrite(returnedParams, callBackRetry)
+                                        await this.cli.batchWrite(returnedParams, callBackRetry)
                                     }
                                 }
                                 return resolve();
@@ -260,7 +260,7 @@ class DynamoTools {
                                 reject(new Error(`putItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`))
                             } else {
                                 recursiveCallCount += 1
-                                this.cli.batchWrite(returnedParams, callBackRetry)
+                                await this.cli.batchWrite(returnedParams, callBackRetry)
                             }
                         }
 
@@ -387,7 +387,7 @@ class DynamoTools {
 
                                 if(Object.keys(returnedParams.UnprocessedKeys).length !== 0) {
                                     if(nestedCallIdx < threshold) {
-                                        this.cli.batchGet(returnedParams, callbackRetry)
+                                        await this.cli.batchGet(returnedParams, callbackRetry)
                                     } else {
                                         reject(new Error(`getItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`))
                                     }
@@ -410,7 +410,7 @@ class DynamoTools {
 
                     if (Object.keys(returnedParams.RequestItems).length !== 0) {
                         if (nestedCallIdx < threshold) {
-                                this.cli.batchGet(returnedParams, callbackRetry)
+                              await this.cli.batchGet(returnedParams, callbackRetry)
                             } else {
                                 reject(new Error(`getItems failed as you exceed the number of authorized recursive call (threshold set to ${threshold})`))
                             }
