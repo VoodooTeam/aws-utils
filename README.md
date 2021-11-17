@@ -22,6 +22,7 @@ Supported and tested : >= 12.x
 
 | Version       | Supported     | Tested         |
 | ------------- |:-------------:|:--------------:|
+| 16.x          | yes           | yes            |
 | 14.x          | yes           | yes            |
 | 12.x          | yes           | yes            |
 
