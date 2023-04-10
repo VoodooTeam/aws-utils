@@ -36,7 +36,7 @@
   "homepage": "https://github.com/VoodooTeam/aws-utils#readme",
   "dependencies": {
     "async-await-retry": "1.2.4",
-    "aws-sdk": "2.1030.0"
+    "aws-sdk": "2.1354.0"
   },
   "devDependencies": {
     "aws-sdk-mock": "^5.4.0",
